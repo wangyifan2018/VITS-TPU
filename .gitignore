@@ -1,0 +1,9 @@
+__pycache__/
+build/
+models/
+monotonic_align/monotonic_align/
+*.pth
+*.onnx
+*.wav
+*.pt
+*.so
