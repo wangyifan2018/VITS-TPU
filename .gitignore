@@ -1,7 +1,7 @@
 __pycache__/
 build/
-models/
 monotonic_align/monotonic_align/
+*.bmodel
 *.pth
 *.onnx
 *.wav
