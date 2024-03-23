@@ -8,6 +8,8 @@ from text import cleaned_text_to_sequence
 from vits_pinyin import VITS_PinYin
 import time
 import logging
+import uuid
+
 logging.basicConfig(level=logging.INFO)
 
 
@@ -20,7 +22,6 @@ class VITS:
         logging.info("load {} success!".format(args.bmodel))
         self.graph_name = self.net.get_graph_names()[0]
         self.input_name = self.net.get_input_names(self.graph_name)[0]
-        self.output_names = self.net.get_output_names(self.graph_name)
         self.input_shape = self.net.get_input_shape(self.graph_name, self.input_name)
         self.max_length = self.input_shape[1]
 
@@ -143,6 +144,11 @@ class VITS:
             # Extract a sequence of length `self.max_length` from x
             start_time = time.time()
             input_data = {self.input_name: x_segments[i]}
+            import uuid
+
+            # 使用UUID生成唯一文件名
+            unique_filename = f'cali/vits_{uuid.uuid4()}.npz'
+            np.savez(unique_filename, **input_data)
             output_data = self.net.process(self.graph_name, input_data)
             self.inference_time += time.time() - start_time
             y_max, y_segment = output_data.values()

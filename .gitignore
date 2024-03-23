@@ -1,5 +1,6 @@
 __pycache__/
 build/
+cali/
 monotonic_align/monotonic_align/
 *.bmodel
 *.pth
@@ -7,3 +8,4 @@ monotonic_align/monotonic_align/
 *.wav
 *.pt
 *.so
+*.npz

@@ -3,7 +3,6 @@ from pypinyin import lazy_pinyin, Style
 from pypinyin.core import load_phrases_dict
 
 from text import pinyin_dict
-from bert import TTSProsody
 
 
 def is_chinese(uchar):
@@ -45,8 +44,6 @@ class VITS_PinYin:
     def __init__(self, bert_path, device, hasBert=True):
         load_pinyin_dict()
         self.hasBert = hasBert
-        if self.hasBert:
-            self.prosody = TTSProsody(bert_path, device)
         self.normalizer = Normalizer()
 
     def get_phoneme4pinyin(self, pinyins):
@@ -84,9 +81,6 @@ class VITS_PinYin:
         chars.append('[PAD]')
         chars = "".join(chars)
         char_embeds = None
-        if self.hasBert:
-            char_embeds = self.prosody.get_char_embeds(chars)
-            char_embeds = self.prosody.expand_for_phone(char_embeds, count_phone)
         return " ".join(phonemes), char_embeds
 
     def correct_pinyin_tone3(self, text):
