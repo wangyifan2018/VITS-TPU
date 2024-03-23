@@ -8,6 +8,7 @@ Several recent end-to-end text-to-speech (TTS) models enabling single-stage trai
 ## Environment setup
 
 ```bash
+# if you just want to infer, checkout to release branch
 pip install -r requirements.txt
 
 cd monotonic_align
@@ -17,14 +18,25 @@ python setup.py build_ext --inplace
 
 ## Get model
 
-[vits-chinese_f16.bmodel](https://github.com/wangyifan2018/VITS-TPU/releases/download/v1.0/vits-chinese_f16.bmodel)
+you can download bmodel
+```bash
+wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v2.0/vits_chinese_128_f16.bmodel
+```
 
-[vits-chinese_f32.bmodel](https://github.com/wangyifan2018/VITS-TPU/releases/download/v1.0/vits-chinese_f32.bmodel)
+or export by yourself
+```bash
+wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v2.0/vits_bert_model.pth
+
+python model_onnx.py --config configs/bert_vits.json --model vits_bert_model.pth
+
+# source tpu-mlir first
+./scripts/gen_bmodel.sh
+```
 
 ## Infer with sophgo bmodel
 
 ```bash
-python vits_infer_sail.py --bmodel models/vits_chinese_128_f16.bmodel --text_file vits_infer_item.txt
+python vits_infer_sail.py --bmodel vits_chinese_128_f16.bmodel --text_file vits_infer_item.txt
 ```
 
 ./results have the waves inferred, listen !!!

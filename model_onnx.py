@@ -1,15 +1,12 @@
 #!/usr/bin/env python3
-from pathlib import Path
 from typing import Any, Dict
-
 import math
-import onnx
-import torch
 import argparse
-from onnxsim import simplify
 import utils
 from text.symbols import symbols
-
+import onnx
+from onnxsim import simplify
+import torch
 from torch import nn
 from torch.nn import functional as F
 from torch.nn import Conv1d, ConvTranspose1d

@@ -163,7 +163,7 @@ class VITS:
         """
         Args:
           x:
-            A int32 array of shape (1, 128) or (1, 512)
+            A int32 array of shape (1, 128)
         """
         # self.set_stage(x)
         x_segments = self.preprocess(x)
