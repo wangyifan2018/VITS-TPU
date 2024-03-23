@@ -6,3 +6,6 @@ numpy
 pypinyin
 soundfile
 scipy
+onnx
+onnxruntime
+onnx-simplifier

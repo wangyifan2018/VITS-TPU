@@ -1,7 +1,4 @@
-import re
-
 from tn.chinese.normalizer import Normalizer
-
 from pypinyin import lazy_pinyin, Style
 from pypinyin.core import load_phrases_dict
 
