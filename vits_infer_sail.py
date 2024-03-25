@@ -19,9 +19,9 @@ class VITS:
         self.net = sail.Engine(args.bmodel, args.dev_id, sail.IOMode.SYSIO)
         logging.info("load {} success!".format(args.bmodel))
         self.graph_name = self.net.get_graph_names()[0]
-        self.input_name = self.net.get_input_names(self.graph_name)[0]
+        self.input_names = self.net.get_input_names(self.graph_name)
         self.output_names = self.net.get_output_names(self.graph_name)
-        self.input_shape = self.net.get_input_shape(self.graph_name, self.input_name)
+        self.input_shape = self.net.get_input_shape(self.graph_name, self.input_names[0])
         self.max_length = self.input_shape[1]
 
         self.inference_time = 0.0
@@ -121,66 +121,56 @@ class VITS:
 
     def preprocess(self, x: np.ndarray):
         x = np.expand_dims(x, axis=0) if x.ndim == 1 else x
-        # Initialize an empty list to collect output tensors
-        x_segments = []
-        for i in range(0, x.shape[1], self.max_length):
-            # Extract a sequence of length `self.max_length` from x
-            x_segment = x[:, i:i + self.max_length]
+        if x.shape[1] < self.max_length:
+            padding_size = self.max_length - x.shape[1]
+            x = np.pad(x, [(0, 0), (0, padding_size)], mode='constant', constant_values=0)
 
-            # If the segment is shorter than `self.max_length`, pad it
-            if x_segment.shape[1] < self.max_length:
-                padding_size = self.max_length - x_segment.shape[1]
-                x_segment = np.pad(x_segment, [(0, 0), (0, padding_size)], mode='constant', constant_values=0)
-
-            x_segments.append(x_segment)
-        return x_segments
+        return x
 
 
-    def inference(self, x_segments: list[np.ndarray]):
+    def inference(self, x: np.ndarray, char_embeds: np.ndarray):
         # Initialize an empty list to collect output tensors
         outputs = []
-        for i in range(len(x_segments)):
-            # Extract a sequence of length `self.max_length` from x
-            start_time = time.time()
-            input_data = {self.input_name: x_segments[i]}
-            output_data = self.net.process(self.graph_name, input_data)
-            self.inference_time += time.time() - start_time
-            y_max, y_segment = output_data.values()
 
-            if i == len(x_segments) - 1:
-                # This is the last segment, cast slice
-                y_segment = y_segment[:math.ceil(y_max[0] / self.stage_factor * len(y_segment))]
-                y_segment = self.remove_silence_from_end(y_segment, self.sample_rate)
+        # Extract a sequence of length `self.max_length` from x
+        start_time = time.time()
+        input_data = {self.input_names[0]: x, self.input_names[1]: char_embeds}
+        output_data = self.net.process(self.graph_name, input_data)
+        self.inference_time += time.time() - start_time
+        y_max, y_segment = output_data.values()
 
-            # Collect the output
-            outputs.append(y_segment)
+        y_segment = y_segment[:math.ceil(y_max[0] / self.stage_factor * len(y_segment) + 1)]
+        y_segment = self.remove_silence_from_end(y_segment, self.sample_rate)
+
+        # Collect the output
+        outputs.append(y_segment)
 
         # Concatenate all output segments along the sequence dimension
         y = np.concatenate(outputs, axis=-1)
         return y
 
-    def __call__(self, x: np.ndarray):
+    def __call__(self, x: np.ndarray, char_embeds: np.ndarray):
         """
         Args:
           x:
             A int32 array of shape (1, 128)
         """
-        # self.set_stage(x)
-        x_segments = self.preprocess(x)
-        y = self.inference(x_segments)
+
+        x = self.preprocess(x)
+        y = self.inference(x, char_embeds)
         return y
 
 
 def main():
     parser = argparse.ArgumentParser(
         description='Inference code for bert vits models')
-    parser.add_argument('--bmodel', type=str, default='vits-chinese_f16.bmodel', help='path of bmodel')
+    parser.add_argument('--bmodel', type=str, default='vits_chinese_f16.bmodel', help='path of bmodel')
     parser.add_argument('--text_file', type=str, default='vits_infer_item.txt', help='path of text')
     parser.add_argument('--dev_id', type=int, default=0, help='dev id')
     args = parser.parse_args()
     vits = VITS(args)
 
-    tts_front = VITS_PinYin(None, None, hasBert=False)
+    tts_front = VITS_PinYin(bert_path = "./bert", device=args.dev_id, hasBert=True)
     results_path = "./results/"
     os.makedirs(results_path, exist_ok=True)
 
@@ -197,16 +187,17 @@ def main():
         if not item:
             break
 
-        # cut log items
-        split_items = vits.split_text_near_punctuation(item, int(vits.max_length / 2))
+        n += 1
+        # cut log items, str len <= 64
+        split_items = vits.split_text_near_punctuation(item, int(vits.max_length / 2 + 1))
         output_audio =[]
         for split_item in split_items:
             logging.info(split_item)
-            phonemes, _ = tts_front.chinese_to_phonemes(split_item)
+            phonemes, char_embeds = tts_front.chinese_to_phonemes(split_item)
             input_ids = cleaned_text_to_sequence(phonemes)
+            char_embeds = np.expand_dims(char_embeds, 0)
             x = np.array(input_ids, dtype=np.int32)
-            output_audio.append(vits(x))
-        n += 1
+            output_audio.append(vits(x, char_embeds))
 
         audio_path = f"{results_path}sail_{n}.wav"
         soundfile.write(

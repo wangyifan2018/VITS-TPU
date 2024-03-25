@@ -1118,7 +1118,7 @@ class TextEncoder(nn.Module):
         self.p_dropout = p_dropout
 
         self.emb = nn.Embedding(n_vocab, hidden_channels)
-        # self.emb_bert = nn.Linear(256, hidden_channels)
+        self.emb_bert = nn.Linear(256, hidden_channels)
         nn.init.normal_(self.emb.weight, 0.0, hidden_channels**-0.5)
 
         self.encoder = Encoder(
@@ -1126,11 +1126,11 @@ class TextEncoder(nn.Module):
         )
         self.proj = nn.Conv1d(hidden_channels, out_channels * 2, 1)
 
-    def forward(self, x, x_lengths):
+    def forward(self, x, x_lengths, bert = None):
         x = self.emb(x) * math.sqrt(self.hidden_channels)  # [b, t, h]
-        # if bert is not None:
-        #     b = self.emb_bert(bert)
-        #     x = x + b
+        if bert is not None:
+            b = self.emb_bert(bert)
+            x = x + b
         x = torch.transpose(x, 1, -1)  # [b, h, t]
         x_mask = torch.unsqueeze(utils.sequence_mask(x_lengths, x.size(2)), 1).to(
             x.dtype
@@ -1225,9 +1225,9 @@ class SynthesizerEval(nn.Module):
         self.flow.remove_weight_norm()
 
 
-    def infer(self, x):
+    def infer(self, x, prosody = None):
         x_lengths = torch.tensor([x.shape[1]], dtype=torch.int32)
-        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths)
+        x, m_p, logs_p, x_mask = self.enc_p(x, x_lengths, prosody)
         logw = self.dp(x, x_mask, g=None)
         w_ceil = torch.ceil(torch.exp(logw) * x_mask + 0.35)
         y_lengths = torch.clamp_min(torch.sum(w_ceil, [1, 2]), 1)
@@ -1338,10 +1338,12 @@ class OnnxModel(torch.nn.Module):
     #     )
     def forward(
         self,
-        x
+        x,
+        prosody
         ):
         return self.model.infer(
-            x=x
+            x=x,
+            prosody = prosody
         )
 
 
@@ -1400,12 +1402,14 @@ def main():
 
     x = torch.randint(low=0, high=100, size=(128,), dtype=torch.int32)
     x = x.unsqueeze(0)
+
+    prosody = torch.rand((1, 128, 256), dtype=torch.float32)
     torch.onnx.export(
         model,
-        x,
+        (x,prosody),
         filename,
         opset_version=opset_version,
-        input_names=["x"],
+        input_names=["x","prosody"],
         output_names=["y","y_max"]
     )
 
