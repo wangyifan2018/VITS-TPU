@@ -8,3 +8,4 @@ monotonic_align/monotonic_align/
 *.wav
 *.pt
 *.so
+*.npz

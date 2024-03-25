@@ -4,10 +4,13 @@ import argparse
 import numpy as np
 import math
 import sophon.sail as sail
-from text import cleaned_text_to_sequence
-from vits_pinyin import VITS_PinYin
+from text import cleaned_text_to_sequence, pinyin_dict
 import time
 import logging
+from tn.chinese.normalizer import Normalizer
+from pypinyin import lazy_pinyin, Style
+from pypinyin.core import load_phrases_dict
+from bert import TTSProsody
 logging.basicConfig(level=logging.INFO)
 
 
@@ -24,6 +27,7 @@ class VITS:
         self.input_shape = self.net.get_input_shape(self.graph_name, self.input_names[0])
         self.max_length = self.input_shape[1]
 
+        self.tts_front = VITS_PinYin(bert_path = args.bert_path, device=args.dev_id, hasBert=True)
         self.inference_time = 0.0
         self.sample_rate = 16000
         self.stage_factor = 900.0
@@ -56,7 +60,7 @@ class VITS:
         return initial_energy
 
 
-    def remove_silence_from_end(self, audio, sample_rate, threshold=0.01, frame_length=512):
+    def remove_silence_from_end(self, audio, sample_rate, threshold=0.005, frame_length=512):
         """
         Removes silence from the end of an audio signal using a specified energy threshold.
         If no threshold is provided, it estimates one based on the initial part of the audio.
@@ -161,16 +165,114 @@ class VITS:
         return y
 
 
+
+def is_chinese(uchar):
+    if uchar >= u'\u4e00' and uchar <= u'\u9fa5':
+        return True
+    else:
+        return False
+
+
+def clean_chinese(text: str):
+    text = text.strip()
+    text_clean = []
+    for char in text:
+        if (is_chinese(char)):
+            text_clean.append(char)
+        else:
+            if len(text_clean) > 1 and is_chinese(text_clean[-1]):
+                text_clean.append(',')
+    text_clean = ''.join(text_clean).strip(',')
+    return text_clean
+
+
+def load_pinyin_dict():
+    my_dict={}
+    with open("./text/pinyin-local.txt", "r", encoding='utf-8') as f:
+        content = f.readlines()
+        for line in content:
+            cuts = line.strip().split()
+            hanzi = cuts[0]
+            phone = cuts[1:]
+            tmp = []
+            for p in phone:
+                tmp.append([p])
+            my_dict[hanzi] = tmp
+    load_phrases_dict(my_dict)
+
+
+class VITS_PinYin:
+    def __init__(self, bert_path, device, hasBert=True):
+        load_pinyin_dict()
+        self.hasBert = hasBert
+        if self.hasBert:
+            self.prosody = TTSProsody(bert_path, device)
+        self.normalizer = Normalizer()
+        self.inference_time = 0.0
+
+    def get_phoneme4pinyin(self, pinyins):
+        result = []
+        count_phone = []
+        for pinyin in pinyins:
+            if pinyin[:-1] in pinyin_dict:
+                tone = pinyin[-1]
+                a = pinyin[:-1]
+                a1, a2 = pinyin_dict[a]
+                result += [a1, a2 + tone]
+                count_phone.append(2)
+        return result, count_phone
+
+    def chinese_to_phonemes(self, text):
+        text = self.normalizer.normalize(text)
+        text = clean_chinese(text)
+        phonemes = ["sil"]
+        chars = ['[PAD]']
+        count_phone = []
+        count_phone.append(1)
+        for subtext in text.split(","):
+            if (len(subtext) == 0):
+                continue
+            pinyins = self.correct_pinyin_tone3(subtext)
+            sub_p, sub_c = self.get_phoneme4pinyin(pinyins)
+            phonemes.extend(sub_p)
+            phonemes.append("sp")
+            count_phone.extend(sub_c)
+            count_phone.append(1)
+            chars.append(subtext)
+            chars.append(',')
+        phonemes.append("sil")
+        count_phone.append(1)
+        chars.append('[PAD]')
+        chars = "".join(chars)
+        char_embeds = None
+
+        if self.hasBert:
+            start_time = time.time()
+            char_embeds = self.prosody.get_char_embeds(chars)
+            self.inference_time +=  time.time() - start_time
+            char_embeds = self.prosody.expand_for_phone(char_embeds, count_phone)
+        return " ".join(phonemes), char_embeds
+
+    def correct_pinyin_tone3(self, text):
+        pinyin_list = lazy_pinyin(text,
+                                  style=Style.TONE3,
+                                  strict=False,
+                                  neutral_tone_with_five=True,
+                                  tone_sandhi=True)
+        # , tone_sandhi=True -> 33变调
+        return pinyin_list
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Inference code for bert vits models')
     parser.add_argument('--bmodel', type=str, default='vits_chinese_f16.bmodel', help='path of bmodel')
+    parser.add_argument('--bert_path', type=str, default='./bert', help='path of bert config')
     parser.add_argument('--text_file', type=str, default='vits_infer_item.txt', help='path of text')
     parser.add_argument('--dev_id', type=int, default=0, help='dev id')
     args = parser.parse_args()
     vits = VITS(args)
 
-    tts_front = VITS_PinYin(bert_path = "./bert", device=args.dev_id, hasBert=True)
     results_path = "./results/"
     os.makedirs(results_path, exist_ok=True)
 
@@ -193,7 +295,7 @@ def main():
         output_audio =[]
         for split_item in split_items:
             logging.info(split_item)
-            phonemes, char_embeds = tts_front.chinese_to_phonemes(split_item)
+            phonemes, char_embeds = vits.tts_front.chinese_to_phonemes(split_item)
             input_ids = cleaned_text_to_sequence(phonemes)
             char_embeds = np.expand_dims(char_embeds, 0)
             x = np.array(input_ids, dtype=np.int32)
@@ -209,7 +311,7 @@ def main():
 
     # calculate speed
     logging.info("------------------ Predict Time Info ----------------------")
-    inference_time = vits.inference_time
+    inference_time = vits.inference_time + vits.tts_front.inference_time
     logging.info("text nums: {}, inference_time(ms): {:.2f}".format(n, inference_time * 1000))
     logging.info("text nums: {}, total_time(ms): {:.2f}".format(n, total_time * 1000))
 
