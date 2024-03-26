@@ -27,7 +27,7 @@ class VITS:
         self.input_shape = self.net.get_input_shape(self.graph_name, self.input_names[0])
         self.max_length = self.input_shape[1]
 
-        self.tts_front = VITS_PinYin(bert_path = args.bert_path, device=args.dev_id, hasBert=True)
+        self.tts_front = VITS_PinYin(args, hasBert=True)
         self.inference_time = 0.0
         self.sample_rate = 16000
         self.stage_factor = 900.0
@@ -202,11 +202,11 @@ def load_pinyin_dict():
 
 
 class VITS_PinYin:
-    def __init__(self, bert_path, device, hasBert=True):
+    def __init__(self, args, hasBert=True):
         load_pinyin_dict()
         self.hasBert = hasBert
         if self.hasBert:
-            self.prosody = TTSProsody(bert_path, device)
+            self.prosody = TTSProsody(args)
         self.normalizer = Normalizer()
         self.inference_time = 0.0
 
@@ -291,7 +291,7 @@ def main():
 
         n += 1
         # cut log items, str len <= 64
-        split_items = vits.split_text_near_punctuation(item, int(vits.max_length / 2 + 1))
+        split_items = vits.split_text_near_punctuation(item, int(vits.max_length / 2 - 5))
         output_audio =[]
         for split_item in split_items:
             logging.info(split_item)
