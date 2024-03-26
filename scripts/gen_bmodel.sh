@@ -1,9 +1,9 @@
 model_transform.py \
     --model_name vits_chinese_128 \
     --model_def ./vits_chinese_128.onnx \
-    --input_shapes [[1,128]] \
-    --input_types [int32] \
-    --test_input vits_128.npz \
+    --input_shapes [[1,128],[1,128,256]] \
+    --input_types [int32,float32] \
+    --test_input vits_128.npz\
     --test_result vits_chinese_128_top_outputs.npz \
     --mlir vits_chinese_128.mlir
 
