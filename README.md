@@ -25,6 +25,7 @@ python setup.py build_ext --inplace
 
 you can download bmodel
 ```bash
+# in this path (./VITS-TPU)
 wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v3.0/vits_bert_128.bmodel
 wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v3.0/bert_1684x_f32.bmodel
 mv bert_1684x_f32.bmodel ./bert
@@ -37,7 +38,7 @@ wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v3.0/vits_bert_
 python model_onnx.py --config configs/bert_vits.json --model vits_bert_model.pth
 
 # source tpu-mlir first
-#
+# need to change model path
 ./scripts/gen_bmodel.sh
 ```
 
