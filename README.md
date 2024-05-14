@@ -9,8 +9,6 @@ Several recent end-to-end text-to-speech (TTS) models enabling single-stage trai
 ## Environment setup
 
 ```bash
-# install sail and other dependence
-# https://doc.sophgo.com/sdk-docs/v23.10.01/docs_latest_release/docs/sophon-sail/docs/zh/html/1_build.html
 pip install -r requirements.txt
 
 # if you want to export model
@@ -20,6 +18,8 @@ cd monotonic_align
 mkdir monotonic_align
 python setup.py build_ext --inplace
 ```
+
+此例程`依赖sail`，安装方法请参考[Sail_Install_Guide](./docs/Sail_Install_Guide.md)
 
 ## Get model
 
@@ -37,6 +37,7 @@ wget https://github.com/wangyifan2018/VITS-TPU/releases/download/v3.0/vits_bert_
 python model_onnx.py --config configs/bert_vits.json --model vits_bert_model.pth
 
 # source tpu-mlir first
+#
 ./scripts/gen_bmodel.sh
 ```
 
