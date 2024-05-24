@@ -9,3 +9,4 @@ monotonic_align/monotonic_align/
 *.pt
 *.so
 *.npz
+*.zip

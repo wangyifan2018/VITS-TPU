@@ -19,15 +19,15 @@ class VITS:
         self,
         args,
     ):
-        self.net = sail.Engine(args.bmodel, args.dev_id, sail.IOMode.SYSIO)
-        logging.info("load {} success!".format(args.bmodel))
+        self.net = sail.Engine(args.vits_model, args.dev_id, sail.IOMode.SYSIO)
+        logging.info("load {} success!".format(args.vits_model))
         self.graph_name = self.net.get_graph_names()[0]
         self.input_names = self.net.get_input_names(self.graph_name)
         self.output_names = self.net.get_output_names(self.graph_name)
         self.input_shape = self.net.get_input_shape(self.graph_name, self.input_names[0])
         self.max_length = self.input_shape[1]
 
-        self.tts_front = VITS_PinYin(args, hasBert=True)
+        self.tts_front = VITS_PinYin(args.bert_model, args.dev_id, hasBert=True)
         self.inference_time = 0.0
         self.sample_rate = 16000
         self.stage_factor = 900.0
@@ -202,11 +202,11 @@ def load_pinyin_dict():
 
 
 class VITS_PinYin:
-    def __init__(self, args, hasBert=True):
+    def __init__(self, bert_model, dev_id, hasBert=True):
         load_pinyin_dict()
         self.hasBert = hasBert
         if self.hasBert:
-            self.prosody = TTSProsody(args)
+            self.prosody = TTSProsody(bert_model, dev_id)
         self.normalizer = Normalizer()
         self.inference_time = 0.0
 
@@ -266,8 +266,8 @@ class VITS_PinYin:
 def main():
     parser = argparse.ArgumentParser(
         description='Inference code for bert vits models')
-    parser.add_argument('--bmodel', type=str, default='vits_chinese_f16.bmodel', help='path of bmodel')
-    parser.add_argument('--bert_path', type=str, default='./bert', help='path of bert config')
+    parser.add_argument('--vits_model', type=str, default='./bmodel/vits_bert_128.bmodel', help='path of bmodel')
+    parser.add_argument('--bert_model', type=str, default='./bmodel/bert_1684x_f32.bmodel', help='path of bert config')
     parser.add_argument('--text_file', type=str, default='vits_infer_item.txt', help='path of text')
     parser.add_argument('--dev_id', type=int, default=0, help='dev id')
     args = parser.parse_args()

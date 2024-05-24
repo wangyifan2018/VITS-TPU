@@ -6,19 +6,18 @@ import numpy as np
 
 
 class TTSProsody(object):
-    def __init__(self, args):
+    def __init__(self, bert_model = "./bmodel/bert_1684x_f32.bmodel", dev_id = 0):
         # use dynamic bert
-        bmodel_path = os.path.join(args.bert_path, 'bert_1684x_f32.bmodel')
-        self.net = sail.Engine(bmodel_path, args.dev_id, sail.IOMode.SYSIO)
-        logging.info("load {} success!".format(bmodel_path))
+        self.net = sail.Engine(bert_model, dev_id, sail.IOMode.SYSIO)
+        logging.info("load {} success!".format(bert_model))
         self.graph_name = self.net.get_graph_names()[0]
         self.input_names = self.net.get_input_names(self.graph_name)
         self.output_names = self.net.get_output_names(self.graph_name)
         self.input_shape = self.net.get_input_shape(self.graph_name, self.input_names[0])
         self.max_length = self.input_shape[1]
 
-        self.tokenizer = BertTokenizer.from_pretrained(args.bert_path)
-        self.bert_config = BertConfig.from_pretrained(args.bert_path)
+        self.tokenizer = BertTokenizer.from_pretrained("./bert")
+        self.bert_config = BertConfig.from_pretrained("./bert")
 
     def text2Token(self, text):
         token = self.tokenizer.tokenize(text)
@@ -64,10 +63,3 @@ class TTSProsody(object):
         padded_expand_embeds = np.vstack((expand_embeds, padding))
         assert padded_expand_embeds.shape[0] == self.max_length * 2
         return padded_expand_embeds
-
-
-if __name__ == "__main__":
-    prosody = TTSProsody('./bert/')
-    while True:
-        text = input("请输入文本：")
-        prosody.get_char_embeds(text)
